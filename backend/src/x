@@ -1,0 +1,115 @@
+-- Create silver schema and cleaned_dataset table with feature-engineered columns
+CREATE SCHEMA IF NOT EXISTS silver;
+
+CREATE TABLE IF NOT EXISTS silver.cleaned_dataset (
+    booking_id           TEXT PRIMARY KEY,
+    customer_id          TEXT,
+    vehicle_type         TEXT,
+    booking_status       TEXT,
+    booking_value        NUMERIC(10,2),
+    ride_distance        NUMERIC(10,2),
+    payment_method       TEXT,
+    trip_timestamp       TIMESTAMP,
+    pickup_hour          INTEGER,
+    day_of_week          INTEGER,   -- 0=Sunday, 6=Saturday
+    day_name             TEXT,      -- Monday, Tuesday, ...
+    month                INTEGER,
+    year                 INTEGER,
+    is_weekend           BOOLEAN,
+    unified_cancellation_reason TEXT,
+    driver_rating        NUMERIC(3,2),
+    customer_rating      NUMERIC(3,2),
+    driver_rating_imputed  BOOLEAN DEFAULT FALSE,
+    customer_rating_imputed BOOLEAN DEFAULT FALSE,
+    is_cancelled         BOOLEAN
+);
+
+-- Extract time-based features during insertion
+INSERT INTO silver.cleaned_dataset (...)
+SELECT
+    ...,
+    TO_TIMESTAMP("Date" || ' ' || "Time", 'MM/DD/YYYY HH24:MI:SS') AS trip_timestamp,
+    EXTRACT(HOUR FROM TO_TIMESTAMP("Date" || ' ' || "Time", 'MM/DD/YYYY HH24:MI:SS')) AS pickup_hour,
+    EXTRACT(DOW FROM TO_TIMESTAMP("Date" || ' ' || "Time", 'MM/DD/YYYY HH24:MI:SS')) AS day_of_week,
+    TO_CHAR(TO_TIMESTAMP("Date" || ' ' || "Time", 'MM/DD/YYYY HH24:MI:SS'), 'FMDay') AS day_name,
+    EXTRACT(MONTH FROM TO_TIMESTAMP("Date" || ' ' || "Time", 'MM/DD/YYYY HH24:MI:SS')) AS month,
+    EXTRACT(YEAR FROM TO_TIMESTAMP("Date" || ' ' || "Time", 'MM/DD/YYYY HH24:MI:SS')) AS year,
+    CASE WHEN EXTRACT(DOW FROM TO_TIMESTAMP("Date" || ' ' || "Time", 'MM/DD/YYYY HH24:MI:SS')) IN (0, 6)
+         THEN TRUE ELSE FALSE END AS is_weekend,
+    ...
+FROM bronze.raw_dataset;
+
+INSERT INTO silver.cleaned_dataset (
+    booking_id, customer_id, vehicle_type, booking_status,
+    booking_value, ride_distance, payment_method,
+    trip_timestamp,
+    pickup_hour, day_of_week, day_name, month, year, is_weekend,
+    unified_cancellation_reason,
+    driver_rating, customer_rating,
+    is_cancelled
+)
+SELECT
+    "Booking ID",
+    "Customer ID",
+    "Vehicle Type",
+    "Booking Status",
+    NULLIF("Booking Value", '')::NUMERIC,
+    NULLIF("Ride Distance", '')::NUMERIC,
+    "Payment Method",
+    TO_TIMESTAMP("Date" || ' ' || "Time", 'MM/DD/YYYY HH24:MI:SS'),
+    EXTRACT(HOUR FROM TO_TIMESTAMP("Date" || ' ' || "Time", 'MM/DD/YYYY HH24:MI:SS')),
+    EXTRACT(DOW FROM TO_TIMESTAMP("Date" || ' ' || "Time", 'MM/DD/YYYY HH24:MI:SS')),
+    TO_CHAR(TO_TIMESTAMP("Date" || ' ' || "Time", 'MM/DD/YYYY HH24:MI:SS'), 'FMDay'),
+    EXTRACT(MONTH FROM TO_TIMESTAMP("Date" || ' ' || "Time", 'MM/DD/YYYY HH24:MI:SS')),
+    EXTRACT(YEAR FROM TO_TIMESTAMP("Date" || ' ' || "Time", 'MM/DD/YYYY HH24:MI:SS')),
+    CASE WHEN EXTRACT(DOW FROM TO_TIMESTAMP("Date" || ' ' || "Time", 'MM/DD/YYYY HH24:MI:SS')) IN (0, 6)
+         THEN TRUE ELSE FALSE END,
+
+    -- -- Unified cancellation reason: pick the reason from the column that has a non-null indicator
+    CASE
+        WHEN "Cancelled Rides by Customer" IS NOT NULL THEN "Reason for cancelling by Customer"
+        WHEN "Cancelled Rides by Driver"   IS NOT NULL THEN "Driver Cancellation Reason"
+        WHEN "Incomplete Rides"            IS NOT NULL THEN "Incomplete Rides Reason"
+        ELSE "Reason Not Specified"
+    END,
+    "Driver Ratings"::NUMERIC(3,2),
+    "Customer Rating"::NUMERIC(3,2),
+    "Booking Status" != 'Completed'
+FROM bronze.raw_dataset
+ON CONFLICT (booking_id) DO NOTHING;
+
+-- Convert empty strings to NULL for numeric fields
+NULLIF("Booking Value", '')::NUMERIC AS booking_value,
+NULLIF("Ride Distance", '')::NUMERIC AS ride_distance,
+
+-- Calculate average ratings per vehicle type for completed trips only
+WITH avg_per_vehicle AS (
+    SELECT
+        vehicle_type,
+        AVG(driver_rating) FILTER (
+            WHERE booking_status = 'Completed' AND driver_rating IS NOT NULL
+        ) AS avg_driver,
+        AVG(customer_rating) FILTER (
+            WHERE booking_status = 'Completed' AND customer_rating IS NOT NULL
+        ) AS avg_customer
+    FROM silver.cleaned_dataset
+    GROUP BY vehicle_type
+)
+-- Update null ratings with vehicle-specific averages and set imputed flags
+UPDATE silver.cleaned_dataset s
+SET
+    driver_rating = COALESCE(s.driver_rating, a.avg_driver, 4.5),
+    customer_rating = COALESCE(s.customer_rating, a.avg_customer, 4.5),
+    driver_rating_imputed = CASE
+        WHEN s.driver_rating IS NULL AND s.booking_status = 'Completed' THEN TRUE
+        ELSE FALSE
+    END,
+    customer_rating_imputed = CASE
+        WHEN s.customer_rating IS NULL AND s.booking_status = 'Completed' THEN TRUE
+        ELSE FALSE
+    END
+FROM avg_per_vehicle a
+WHERE s.vehicle_type = a.vehicle_type
+  AND s.booking_status = 'Completed';
+
+  

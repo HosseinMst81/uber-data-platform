@@ -1,6 +1,6 @@
 const fs = require("fs");
 const csv = require("csv-parser");
-const pool = require("./models/db.js");
+const pool = require("../models/db");
 
 const importData = async () => {
   const client = await pool.connect();

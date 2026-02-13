@@ -4,7 +4,7 @@ const pool = require("../models/db");
 
 const importData = async () => {
   const client = await pool.connect();
-  fs.createReadStream("../../database/original_dataset.csv")
+  fs.createReadStream("../../../database/original_dataset.csv")
     .pipe(csv())
     .on("data", async (row) => {
       const values = Object.values(row).map((value) =>

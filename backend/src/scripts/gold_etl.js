@@ -1,5 +1,5 @@
 require("dotenv").config({ path: "../.env" });
-const pool = require("../src/models/db");
+const pool = require("../models/db");
 
 async function runGoldETL() {
   const client = await pool.connect();

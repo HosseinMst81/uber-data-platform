@@ -1,14 +1,20 @@
 require('dotenv').config({ path: '../.env' });
+
 const express = require('express');
+const cors = require('cors');
+const app = express();
+
+
+// Middleware for read request
+app.use(express.json());                   
+app.use(express.urlencoded({ extended: true }));
+app.use(cors());                          // beacuse we have seprated frontend
+
 const tripRoutes = require('./routes/trips');
 
-const app = express();
-app.use(express.json()); 
-
-// Mount trip routes under /api/trips
 app.use('/api/trips', tripRoutes);
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-  console.log(`🚀 Server is running on port ${PORT}`);
+  console.log(`Server is running on http://localhost:${PORT}`);
 });

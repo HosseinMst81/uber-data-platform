@@ -2,8 +2,25 @@ const pool = require('../models/db');
 
 // Helper function to safely parse numeric values with fallback
 const safeNumber = (value, fallback = null) => {
+  if (value == null) return fallback;
   const num = Number(value);
-  return isNaN(num) ? fallback : num;
+  return Number.isNaN(num) ? fallback : num;
+};
+
+// Normalize a trip row from DB so numeric/boolean fields are proper types (pg returns decimals as strings)
+const normalizeTripRow = (row) => {
+  if (!row || typeof row !== 'object') return row;
+  return {
+    ...row,
+    booking_value: safeNumber(row.booking_value, 0),
+    ride_distance: safeNumber(row.ride_distance, 0),
+    driver_rating: safeNumber(row.driver_rating, null),
+    customer_rating: safeNumber(row.customer_rating, null),
+    revenue_per_km: safeNumber(row.revenue_per_km, null),
+    driver_rating_imputed: Boolean(row.driver_rating_imputed),
+    customer_rating_imputed: Boolean(row.customer_rating_imputed),
+    is_cancelled: Boolean(row.is_cancelled),
+  };
 };
 
 // 1. CREATE - Create a new trip (status defaults to 'Completed')
@@ -93,7 +110,7 @@ const createTrip = async (req, res) => {
 
     return res.status(201).json({
       message: 'Trip created successfully',
-      trip: result.rows[0],
+      trip: normalizeTripRow(result.rows[0]),
     });
   } catch (err) {
     console.error('Error creating trip:', err);
@@ -132,7 +149,9 @@ const getTrips = async (req, res) => {
 
     return res.json({
       total: result.rowCount,
-      trips: result.rows,
+      limit: 100,
+      offset: 0,
+      trips: result.rows.map(normalizeTripRow),
     });
   } catch (err) {
     console.error('Error fetching trips:', err);
@@ -169,7 +188,7 @@ const updateTripStatus = async (req, res) => {
 
     return res.json({
       message: 'Trip status updated successfully',
-      trip: result.rows[0],
+      trip: normalizeTripRow(result.rows[0]),
     });
   } catch (err) {
     console.error('Error updating trip status:', err);
@@ -197,7 +216,7 @@ const deleteTrip = async (req, res) => {
 
     return res.json({
       message: 'Trip deleted successfully',
-      deleted_trip: result.rows[0],
+      deleted_trip: normalizeTripRow(result.rows[0]),
     });
   } catch (err) {
     console.error('Error deleting trip:', err);

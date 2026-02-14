@@ -4,11 +4,13 @@ import { Button } from '@/components/ui/button'
 import {
   Table,
   TableBody,
+  TableCaption,
   TableCell,
   TableHead,
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,8 +29,8 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Pencil, Trash2 } from 'lucide-react'
 import { useState } from 'react'
-import { tripsApi } from '@/lib/api'
 import { toast } from 'sonner'
+import { useUpdateTripStatus, useDeleteTrip } from '@/hooks/use-trips'
 
 export interface TripsTableProps {
   trips: Trip[]
@@ -42,6 +44,12 @@ function truncateId(id: string, len = 8) {
   return `${id.slice(0, len)}…`
 }
 
+/** Safely format a number (backend may send decimals as strings from PostgreSQL). */
+function formatNum(value: unknown, decimals: number): string {
+  const n = Number(value)
+  return Number.isNaN(n) ? '–' : n.toFixed(decimals)
+}
+
 export function TripsTable({
   trips,
   loading,
@@ -50,38 +58,39 @@ export function TripsTable({
 }: TripsTableProps) {
   const [cancelTarget, setCancelTarget] = useState<Trip | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Trip | null>(null)
-  const [updating, setUpdating] = useState(false)
 
-  const handleCancelStatus = async (trip: Trip, newStatus: string) => {
-    setCancelTarget(null)
-    setUpdating(true)
-    try {
-      await tripsApi.updateTripStatus(trip.bookingId, { booking_status: newStatus })
+  const updateStatusMutation = useUpdateTripStatus({
+    onSuccess: () => {
       toast.success('Status updated')
       onStatusUpdated()
-    } catch (e: unknown) {
-      const msg = e && typeof e === 'object' && 'response' in e
-        ? (e as { response?: { data?: { error?: string } } }).response?.data?.error
-        : 'Failed to update status'
-      toast.error(msg ?? 'Failed to update status')
-    } finally {
-      setUpdating(false)
-    }
-  }
-
-  const handleDelete = async (trip: Trip) => {
-    setDeleteTarget(null)
-    try {
-      await tripsApi.deleteTrip(trip.bookingId)
+    },
+    onError: (err: Error) => {
+      const msg = (err as Error & { response?: { data?: { error?: string } } }).response?.data?.error ?? err.message ?? 'Failed to update status'
+      toast.error(msg)
+    },
+  })
+  const deleteMutation = useDeleteTrip({
+    onSuccess: () => {
       toast.success('Trip deleted')
       onDeleted()
-    } catch (e: unknown) {
-      const msg = e && typeof e === 'object' && 'response' in e
-        ? (e as { response?: { data?: { error?: string } } }).response?.data?.error
-        : 'Failed to delete'
-      toast.error(msg ?? 'Failed to delete')
-    }
+    },
+    onError: (err: Error) => {
+      const msg = (err as Error & { response?: { data?: { error?: string } } }).response?.data?.error ?? err.message ?? 'Failed to delete'
+      toast.error(msg)
+    },
+  })
+
+  const handleCancelStatus = (trip: Trip, newStatus: string) => {
+    setCancelTarget(null)
+    updateStatusMutation.mutate({ bookingId: trip.bookingId, payload: { booking_status: newStatus } })
   }
+
+  const handleDelete = (trip: Trip) => {
+    setDeleteTarget(null)
+    deleteMutation.mutate(trip.bookingId)
+  }
+
+  const updating = updateStatusMutation.isPending
 
   const isCompleted = (t: Trip) => t.bookingStatus === 'Completed'
   const isCancelled = (t: Trip) => t.isCancelled
@@ -90,6 +99,7 @@ export function TripsTable({
     return (
       <div className="rounded-md border">
         <Table>
+          <TableCaption>A list of trips. Data is loading.</TableCaption>
           <TableHeader>
             <TableRow>
               <TableHead>Booking ID</TableHead>
@@ -99,8 +109,8 @@ export function TripsTable({
               <TableHead>Value</TableHead>
               <TableHead>Distance</TableHead>
               <TableHead>Payment</TableHead>
-              <TableHead>Driver</TableHead>
-              <TableHead>Customer</TableHead>
+              <TableHead>Driver rating</TableHead>
+              <TableHead>Customer rating</TableHead>
               <TableHead className="w-[80px]">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -109,7 +119,7 @@ export function TripsTable({
               <TableRow key={i}>
                 {Array.from({ length: 10 }).map((_, j) => (
                   <TableCell key={j}>
-                    <div className="h-5 w-16 animate-pulse rounded bg-muted" />
+                    <Skeleton className="h-5 w-16" />
                   </TableCell>
                 ))}
               </TableRow>
@@ -124,6 +134,7 @@ export function TripsTable({
     <>
       <div className="rounded-md border">
         <Table>
+          <TableCaption>A list of trips from the data platform.</TableCaption>
           <TableHeader>
             <TableRow>
               <TableHead>Booking ID</TableHead>
@@ -133,8 +144,8 @@ export function TripsTable({
               <TableHead>Value</TableHead>
               <TableHead>Distance</TableHead>
               <TableHead>Payment</TableHead>
-              <TableHead>Driver</TableHead>
-              <TableHead>Customer</TableHead>
+              <TableHead>Driver rating</TableHead>
+              <TableHead>Customer rating</TableHead>
               <TableHead className="w-[80px]">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -164,14 +175,14 @@ export function TripsTable({
                       {trip.bookingStatus}
                     </span>
                   </TableCell>
-                  <TableCell>{trip.bookingValue.toFixed(2)}</TableCell>
-                  <TableCell>{trip.rideDistance.toFixed(1)} km</TableCell>
+                  <TableCell>{formatNum(trip.bookingValue, 2)}</TableCell>
+                  <TableCell>{formatNum(trip.rideDistance, 1)} km</TableCell>
                   <TableCell>{trip.paymentMethod}</TableCell>
                   <TableCell>
-                    {trip.driverRating != null ? trip.driverRating.toFixed(1) : '–'}
+                    {trip.driverRating != null ? formatNum(trip.driverRating, 1) : '–'}
                   </TableCell>
                   <TableCell>
-                    {trip.customerRating != null ? trip.customerRating.toFixed(1) : '–'}
+                    {trip.customerRating != null ? formatNum(trip.customerRating, 1) : '–'}
                   </TableCell>
                   <TableCell>
                     {isCancelled(trip) ? (

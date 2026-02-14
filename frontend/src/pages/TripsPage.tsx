@@ -1,5 +1,4 @@
-import { useState, useCallback } from 'react'
-import { tripsApi } from '@/lib/api'
+import { useState } from 'react'
 import type { GetTripsParams } from '@/lib/types'
 import { TripFilters } from '@/components/TripFilters'
 import { TripsTable } from '@/components/TripsTable'
@@ -14,8 +13,9 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import type { Trip } from '@/lib/types'
-import { useEffect } from 'react'
+import { useTrips } from '@/hooks/use-trips'
+import { useQueryClient } from '@tanstack/react-query'
+import { tripsKeys } from '@/lib/query-keys'
 
 const LIMIT_OPTIONS = [10, 25, 50, 100]
 
@@ -24,31 +24,21 @@ export function TripsPage() {
     limit: 10,
     offset: 0,
   })
-  const [trips, setTrips] = useState<Trip[]>([])
-  const [total, setTotal] = useState(0)
-  const [loading, setLoading] = useState(true)
 
-  const fetchTrips = useCallback(async () => {
-    setLoading(true)
-    try {
-      const res = await tripsApi.getTrips(filters)
-      setTrips(res.trips)
-      setTotal(res.total)
-    } catch {
-      setTrips([])
-      setTotal(0)
-    } finally {
-      setLoading(false)
-    }
-  }, [filters])
+  const { data, isLoading } = useTrips(filters)
+  const queryClient = useQueryClient()
+  const trips = data?.trips ?? []
+  const total = data?.total ?? 0
 
-  useEffect(() => {
-    fetchTrips()
-  }, [fetchTrips])
+  const refetchTrips = () => {
+    queryClient.invalidateQueries({ queryKey: tripsKeys.list(filters) })
+  }
 
   const applyFilters = () => {
     setFilters((prev) => ({ ...prev, offset: 0 }))
   }
+
+  const limit = filters.limit ?? 10
 
   const resetFilters = () => {
     setFilters({
@@ -57,8 +47,7 @@ export function TripsPage() {
     })
   }
 
-  const page = Math.floor((filters.offset ?? 0) / (filters.limit ?? 10)) + 1
-  const limit = filters.limit ?? 10
+  const page = Math.floor((filters.offset ?? 0) / limit) + 1
   const start = (filters.offset ?? 0) + 1
   const end = Math.min((filters.offset ?? 0) + limit, total)
   const totalPages = Math.ceil(total / limit)
@@ -78,7 +67,7 @@ export function TripsPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-bold tracking-tight">Trips</h1>
-        <CreateTripForm onCreated={fetchTrips} />
+        <CreateTripForm onCreated={refetchTrips} />
       </div>
 
       <TripFilters
@@ -113,9 +102,9 @@ export function TripsPage() {
         <CardContent className="space-y-4">
           <TripsTable
             trips={trips}
-            loading={loading}
-            onStatusUpdated={fetchTrips}
-            onDeleted={fetchTrips}
+            loading={isLoading}
+            onStatusUpdated={refetchTrips}
+            onDeleted={refetchTrips}
           />
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-muted-foreground">

@@ -103,6 +103,7 @@ export function TripsPage() {
           <TripsTable
             trips={trips}
             loading={isLoading}
+            rowStartIndex={total === 0 ? 0 : start}
             onStatusUpdated={refetchTrips}
             onDeleted={refetchTrips}
           />

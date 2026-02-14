@@ -17,10 +17,7 @@ const NotfoundPage = () => {
           <h1 className="text-2xl font-semibold text-foreground">
             Route not found
           </h1>
-          <p className="max-w-sm text-muted-foreground">
-            This trip doesn&apos;t exist. Head back to the platform to explore your data.
-          </p>
-          <Button asChild className="mt-4 gap-2" size="lg">
+          <Button variant={'link'} asChild className="mt-4 gap-2" size="lg">
             <Link to="/">
               <Home className="h-4 w-4" />
               Back to Trips

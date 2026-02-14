@@ -207,9 +207,9 @@ export function TripsTable({
                     key={j}
                     className={
                       j === 0
-                        ? "text-right"
+                        ? "text-center"
                         : j >= 6 && j <= 9
-                          ? "text-right"
+                          ? "text-center"
                           : ""
                     }
                   >
@@ -233,12 +233,12 @@ export function TripsTable({
           </TableCaption>
           <TableHeader>
             <TableRow className="bg-muted/50 hover:bg-muted/50">
-              <TableHead className=" font-semibold">#</TableHead>
+              <TableHead className="text-center font-semibold">#</TableHead>
               <TableHead className="">Date & time</TableHead>
               <TableHead className="">Booking ID</TableHead>
               <TableHead className="">Customer</TableHead>
               <TableHead className="">Vehicle</TableHead>
-              <TableHead className="max-w-1">Status</TableHead>
+              <TableHead className="">Status</TableHead>
               <TableHead className="">Value</TableHead>
               <TableHead className="">Distance</TableHead>
               <TableHead className="">Rev/km</TableHead>
@@ -263,7 +263,7 @@ export function TripsTable({
                 const rowNum = rowStartIndex + index;
                 return (
                   <TableRow key={trip.bookingId} className="group">
-                    <TableCell className="text-right tabular-nums text-muted-foreground font-medium">
+                    <TableCell className="text-center tabular-nums text-muted-foreground font-medium">
                       {rowNum}
                     </TableCell>
 
@@ -310,19 +310,19 @@ export function TripsTable({
                       )}
                     </TableCell>
 
-                    <TableCell className="text-right tabular-nums font-medium">
+                    <TableCell className="text-center tabular-nums font-medium">
                       {trip.bookingValue > 0
                         ? formatNum(trip.bookingValue, 0)
                         : "–"}
                     </TableCell>
 
-                    <TableCell className="text-right tabular-nums">
+                    <TableCell className="text-center tabular-nums">
                       {trip.rideDistance > 0
                         ? `${formatNum(trip.rideDistance, 1)} km`
                         : "–"}
                     </TableCell>
 
-                    <TableCell className="text-right tabular-nums text-muted-foreground">
+                    <TableCell className="text-center tabular-nums text-muted-foreground">
                       {trip.revenuePerKm != null
                         ? formatNum(trip.revenuePerKm, 1)
                         : "–"}

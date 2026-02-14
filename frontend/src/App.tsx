@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom'
 import { TripsPage } from '@/pages/TripsPage'
 import { DashboardPage } from '@/pages/DashboardPage'
+import NotfoundPage from '@/pages/NotfoundPage'
 import { Toaster } from 'sonner'
 import { cn } from '@/lib/utils'
 import { LayoutDashboard, Car } from 'lucide-react'
@@ -47,6 +48,7 @@ function AppLayout() {
         <Routes>
           <Route path="/" element={<TripsPage />} />
           <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="*" element={<NotfoundPage />} />
         </Routes>
       </main>
       <Toaster position="top-right" richColors />

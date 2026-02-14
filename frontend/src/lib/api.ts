@@ -1,10 +1,10 @@
 /**
  * API service for Uber Trip Data Platform.
- * Base URL: http://localhost:3000/api/trips
+ * Uses intercepted axios instance (auth + error handling).
  * Transforms snake_case responses to camelCase for the app.
  */
 
-import axios from 'axios'
+import { httpInterceptedService } from '@/core/http-service'
 import type {
   Trip,
   GetTripsParams,
@@ -13,7 +13,7 @@ import type {
   UpdateTripStatusPayload,
 } from './types'
 
-const API_BASE = 'http://localhost:3000/api/trips'
+const TRIPS_PATH = '/api/trips'
 
 /** Convert snake_case object keys to camelCase (one level only) */
 function toCamel<T extends Record<string, unknown>>(obj: Record<string, unknown>): T {
@@ -34,7 +34,7 @@ export const tripsApi = {
    * GET /api/trips – list trips with optional filters and pagination
    */
   async getTrips(params: GetTripsParams = {}): Promise<GetTripsResponse> {
-    const { data } = await axios.get(API_BASE, { params })
+    const { data } = await httpInterceptedService.get(TRIPS_PATH, { params })
     return {
       total: data.total,
       limit: data.limit,
@@ -47,7 +47,7 @@ export const tripsApi = {
    * POST /api/trips – create a new trip
    */
   async createTrip(payload: CreateTripPayload): Promise<Trip> {
-    const { data } = await axios.post(API_BASE, payload)
+    const { data } = await httpInterceptedService.post(TRIPS_PATH, payload)
     const trip = data.trip ?? data
     return tripFromRow(trip)
   },
@@ -56,7 +56,7 @@ export const tripsApi = {
    * PATCH /api/trips/:bookingId – update trip status
    */
   async updateTripStatus(bookingId: string, payload: UpdateTripStatusPayload): Promise<Trip> {
-    const { data } = await axios.patch(`${API_BASE}/${bookingId}`, payload)
+    const { data } = await httpInterceptedService.patch(`${TRIPS_PATH}/${bookingId}`, payload)
     const trip = data.trip ?? data
     return tripFromRow(trip)
   },
@@ -65,6 +65,6 @@ export const tripsApi = {
    * DELETE /api/trips/:bookingId – delete a trip
    */
   async deleteTrip(bookingId: string): Promise<void> {
-    await axios.delete(`${API_BASE}/${bookingId}`)
+    await httpInterceptedService.delete(`${TRIPS_PATH}/${bookingId}`)
   },
 }

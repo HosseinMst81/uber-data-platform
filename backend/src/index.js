@@ -11,8 +11,10 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cors());                          // beacuse we have seprated frontend
 
 const tripRoutes = require('./routes/trips');
+const analyticsRoutes = require('./routes/analytics');
 
 app.use('/api/trips', tripRoutes);
+app.use('/api/analytics', analyticsRoutes);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {

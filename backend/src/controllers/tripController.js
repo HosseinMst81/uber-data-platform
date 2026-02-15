@@ -130,36 +130,93 @@ const createTrip = async (req, res) => {
 
 // 2. READ - Get all trips or filter by customer_id
 const getTrips = async (req, res) => {
-  const { customer_id } = req.query;
+  const {
+    customer_id,
+    startDate,
+    endDate,
+    vehicleType,
+    limit = 10,
+    offset = 0,
+  } = req.query;
+
+  const parsedLimit = Math.min(Number(limit) || 10, 100);
+  const parsedOffset = Number(offset) || 0;
 
   const client = await pool.connect();
 
   try {
-    let query = 'SELECT * FROM gold.gold_dataset';
-    const values = [];
+    let whereClauses = [];
+    let values = [];
+    let idx = 1;
 
+    // Filter by customer_id
     if (customer_id) {
-      query += ' WHERE customer_id = $1';
+      whereClauses.push(`customer_id = $${idx++}`);
       values.push(customer_id);
     }
 
-    query += ' ORDER BY trip_timestamp DESC LIMIT 100';
+    // Filter by vehicle_type
+    if (vehicleType) {
+      whereClauses.push(`vehicle_type = $${idx++}`);
+      values.push(vehicleType);
+    }
 
-    const result = await client.query(query, values);
+    // Filter by date range
+    if (startDate) {
+      whereClauses.push(`trip_timestamp >= $${idx++}`);
+      values.push(startDate);
+    }
+
+    if (endDate) {
+      whereClauses.push(`trip_timestamp <= $${idx++}`);
+      values.push(endDate);
+    }
+
+    const whereSQL =
+      whereClauses.length > 0
+        ? `WHERE ${whereClauses.join(" AND ")}`
+        : "";
+
+    // Get total count (for pagination)
+    const countQuery = `
+      SELECT COUNT(*) 
+      FROM gold.gold_dataset
+      ${whereSQL}
+    `;
+
+    const countResult = await client.query(countQuery, values);
+    const total = Number(countResult.rows[0].count);
+
+    // Get paginated data
+    const dataQuery = `
+      SELECT *
+      FROM gold.gold_dataset
+      ${whereSQL}
+      ORDER BY trip_timestamp DESC
+      LIMIT $${idx++} OFFSET $${idx++}
+    `;
+
+    const dataResult = await client.query(dataQuery, [
+      ...values,
+      parsedLimit,
+      parsedOffset,
+    ]);
 
     return res.json({
-      total: result.rowCount,
-      limit: 100,
-      offset: 0,
-      trips: result.rows.map(normalizeTripRow),
+      total,
+      limit: parsedLimit,
+      offset: parsedOffset,
+      totalPages: Math.ceil(total / parsedLimit),
+      trips: dataResult.rows.map(normalizeTripRow),
     });
   } catch (err) {
-    console.error('Error fetching trips:', err);
-    return res.status(500).json({ error: 'Internal server error' });
+    console.error("Error fetching trips:", err);
+    return res.status(500).json({ error: "Internal server error" });
   } finally {
     client.release();
   }
 };
+
 
 // 3. UPDATE - Change trip status (and is_cancelled flag)
 const updateTripStatus = async (req, res) => {

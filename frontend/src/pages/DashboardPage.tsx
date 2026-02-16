@@ -1,41 +1,32 @@
-import { CancellationPieChart } from '@/components/Dashboard/CancellationPieChart'
-import { DashboardFilters } from '@/components/Dashboard/DashboardFilters'
-import { KPICards } from '@/components/Dashboard/KPICards'
-import { PaymentPieChart } from '@/components/Dashboard/PaymentPieChart'
-import { PeakHoursChart } from '@/components/Dashboard/PeakHoursChart'
-import { VehicleBarChart } from '@/components/Dashboard/VehiclePieChart'
-import { WeekdayChart } from '@/components/Dashboard/WeekdayChart'
-import { Card } from '@/components/ui/card'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useState, useMemo } from 'react'
 import {
-  useCancellationReasons,
   useKPIs,
+  useCancellationReasons,
   usePaymentMethods,
-  usePeakHours,
   useVehicleAnalysis,
-  useVehicleTypes,
+  usePeakHours,
   useWeekdayAnalysis,
+  useVehicleTypes,
 } from '@/hooks'
 import type { AnalyticsFilters } from '@/lib/analytics-types'
+import { KPICards } from '@/components/Dashboard/KPICards'
+import { CancellationPieChart } from '@/components/Dashboard/CancellationPieChart'
+import { PaymentPieChart } from '@/components/Dashboard/PaymentPieChart'
+import { VehicleBarChart } from '@/components/Dashboard/VehiclePieChart'
+import { PeakHoursChart } from '@/components/Dashboard/PeakHoursChart'
+import { WeekdayChart } from '@/components/Dashboard/WeekdayChart'
+import { DashboardFilters } from '@/components/Dashboard/DashboardFilters'
+import { Card } from '@/components/ui/card'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Loader2 } from 'lucide-react'
-import { useMemo, useState } from 'react'
-
-
-
-
-/** Default date range: last 30 days */
-function getDefaultDateRange() {
-  const end = new Date()
-  const start = new Date()
-  start.setDate(start.getDate() - 30)
-  return {
-    startDate: start.toISOString().slice(0, 10),
-    endDate: end.toISOString().slice(0, 10),
-  }
-}
 
 export function DashboardPage() {
-  const [filters, setFilters] = useState<AnalyticsFilters>(getDefaultDateRange())
+  // Start with all-time data by default
+  const [filters, setFilters] = useState<AnalyticsFilters>({
+    startDate: undefined,
+    endDate: undefined,
+    vehicleType: undefined,
+  })
   const [timeView, setTimeView] = useState<'hourly' | 'weekly'>('hourly')
 
   // Fetch data from APIs
@@ -55,7 +46,7 @@ export function DashboardPage() {
     peakHoursLoading ||
     weekdaysLoading
 
-  // Prepare data for Pie charts
+  // Prepare data for charts
   const cancellationChartData = useMemo(
     () =>
       cancellations?.map((item) => ({
@@ -102,18 +93,18 @@ export function DashboardPage() {
       {/* KPI Cards */}
       <KPICards data={kpis} isLoading={kpisLoading} />
 
-      {/* Pie Charts Grid */}
-      <div className="grid gap-6 md:grid-cols-2">
-        <CancellationPieChart data={cancellationChartData} isLoading={cancellationsLoading} />
-        <PaymentPieChart data={paymentChartData} isLoading={paymentsLoading} />
-      </div>
+      {/* Cancellation Reasons - Full Width */}
+      <CancellationPieChart data={cancellationChartData} isLoading={cancellationsLoading} />
+
+      {/* Payment Methods - Single Column */}
+      <PaymentPieChart data={paymentChartData} isLoading={paymentsLoading} />
 
       {/* Vehicle Analysis Bar Chart */}
       <VehicleBarChart data={vehicles ?? []} isLoading={vehiclesLoading} />
 
       {/* Time Trend Charts with Tabs */}
       <Card className="p-6">
-        <Tabs value={timeView} onValueChange={(v) => setTimeView(v)}>
+        <Tabs value={timeView} onValueChange={(v) => setTimeView(v as never)}>
           <div className="flex items-center justify-between mb-4">
             <div>
               <h2 className="text-xl font-semibold">Time-based Trip Analysis</h2>

@@ -2,14 +2,9 @@ import type { GetTripsParams } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
 
 const VEHICLE_OPTIONS = ['Sedan', 'Auto', 'eBike', 'Bike', 'Moto', 'Mini', 'XL', 'Go']
 const PAYMENT_OPTIONS = ['Credit Card', 'UPI', 'Debit Card', 'Cash', 'Wallet', 'Paytm']
@@ -39,10 +34,10 @@ export function TripFilters({ filters, onFiltersChange, onApply, onReset }: Trip
               value={filters.vehicle_type ?? 'all'}
               onValueChange={(v) => set('vehicle_type', v === 'all' ? undefined : v)}
             >
-              <SelectTrigger>
-                <SelectValue placeholder="All" />
+              <SelectTrigger className="w-full">
+                <SelectValue/>
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent >
                 <SelectItem value="all">All</SelectItem>
                 {VEHICLE_OPTIONS.map((o) => (
                   <SelectItem key={o} value={o}>
@@ -58,13 +53,13 @@ export function TripFilters({ filters, onFiltersChange, onApply, onReset }: Trip
               value={filters.payment_method ?? 'all'}
               onValueChange={(v) => set('payment_method', v === 'all' ? undefined : v)}
             >
-              <SelectTrigger>
+              <SelectTrigger className="w-full">
                 <SelectValue placeholder="All" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All</SelectItem>
                 {PAYMENT_OPTIONS.map((o) => (
-                  <SelectItem key={o} value={o}>
+                  <SelectItem  key={o} value={o}>
                     {o}
                   </SelectItem>
                 ))}

@@ -15,23 +15,23 @@ export function KPICards({ data, isLoading }: Props) {
       value: data?.totalBookings.toLocaleString() ?? '0',
       icon: TrendingUp,
       color: 'text-blue-600',
-      bgColor: 'bg-blue-50 dark:bg-blue-950',
+      bgColor: 'bg-blue-200 ',
       description: 'All reservations',
     },
     {
       title: 'Successful Trips',
       value: data?.successfulBookings.toLocaleString() ?? '0',
       icon: CheckCircle,
-      color: 'text-green-600',
-      bgColor: 'bg-green-50 dark:bg-green-950',
+      color: 'text-emerald-600',
+      bgColor: 'bg-emerald-200',
       description: 'Completed bookings',
     },
     {
       title: 'Total Revenue',
       value: `$${data?.totalRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 }) ?? '0'}`,
       icon: DollarSign,
-      color: 'text-emerald-600',
-      bgColor: 'bg-emerald-50 dark:bg-emerald-950',
+      color: 'text-cyan-600',
+      bgColor: 'bg-cyan-200',
       description: 'From completed trips',
     },
     {
@@ -39,7 +39,7 @@ export function KPICards({ data, isLoading }: Props) {
       value: `${data?.successRate.toFixed(1) ?? '0'}%`,
       icon: Percent,
       color: 'text-purple-600',
-      bgColor: 'bg-purple-50 dark:bg-purple-950',
+      bgColor: 'bg-purple-200',
       description: 'Trip completion rate',
     },
   ]
@@ -68,7 +68,7 @@ export function KPICards({ data, isLoading }: Props) {
       {kpis.map((kpi) => {
         const Icon = kpi.icon
         return (
-          <Card key={kpi.title} className="transition-all hover:shadow-lg hover:scale-[1.02]">
+          <Card key={kpi.title} className="transition-all">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
                 {kpi.title}

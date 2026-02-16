@@ -81,36 +81,54 @@ export const analyticsApi = {
   
   async getCancellationReasons(filters: AnalyticsFilters = {}): Promise<CancellationReason[]> {
     const { data } = await httpInterceptedService.get(`${ANALYTICS_PATH}/cancellation-reasons`, { params: filters })
-    return data.data.map((item: any) => toCamel<CancellationReason>(item))
+    return data.data.map((item: never) => toCamel<CancellationReason>(item))
   },
 
   
   async getPaymentMethods(filters: AnalyticsFilters = {}): Promise<PaymentMethod[]> {
     const { data } = await httpInterceptedService.get(`${ANALYTICS_PATH}/payment-methods`, { params: filters })
-    return data.data.map((item: any) => toCamel<PaymentMethod>(item))
+    return data.data.map((item: never) => toCamel<PaymentMethod>(item))
   },
 
  
   async getVehicleAnalysis(filters: AnalyticsFilters = {}): Promise<VehicleAnalysis[]> {
     const { data } = await httpInterceptedService.get(`${ANALYTICS_PATH}/vehicle-analysis`, { params: filters })
-    return data.data.map((item: any) => toCamel<VehicleAnalysis>(item))
+    return data.data.map((item: never) => toCamel<VehicleAnalysis>(item))
   },
 
   
   async getPeakHours(filters: AnalyticsFilters = {}): Promise<PeakHour[]> {
     const { data } = await httpInterceptedService.get(`${ANALYTICS_PATH}/peak-hours`, { params: filters })
-    return data.data.map((item: any) => toCamel<PeakHour>(item))
+    return data.data.map((item: never) => toCamel<PeakHour>(item))
   },
 
   
   async getWeekdayAnalysis(filters: AnalyticsFilters = {}): Promise<WeekdayData[]> {
     const { data } = await httpInterceptedService.get(`${ANALYTICS_PATH}/weekday-analysis`, { params: filters })
-    return data.data.map((item: any) => toCamel<WeekdayData>(item))
+    return data.data.map((item: never) => toCamel<WeekdayData>(item))
   },
 
   
   async getVehicleTypes(): Promise<string[]> {
     const { data } = await httpInterceptedService.get(`${ANALYTICS_PATH}/vehicle-types`)
     return data.vehicle_types || data.vehicleTypes || []
+  },
+}
+
+const SQL_ASSISTANT_PATH = '/api/sql-assistant'
+
+export type GenerateSQLResponse = {
+  question: string
+  sql: string
+  model: string
+}
+
+export const sqlAssistantApi = {
+  async generateSQL(question: string): Promise<GenerateSQLResponse> {
+    const { data } = await httpInterceptedService.post(
+      `${SQL_ASSISTANT_PATH}/generate`,
+      { question }
+    )
+    return data
   },
 }

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { format } from 'sql-formatter';
 import { Button } from '@/components/ui/button';
 import { Copy, Check } from 'lucide-react';
@@ -28,7 +28,7 @@ export const SQLMessageBlock: React.FC<SQLMessageBlockProps> = ({ sql }) => {
     <div className="relative group">
       <SyntaxHighlighter
         language="sql"
-        style={oneDark} 
+        style={oneLight} 
         customStyle={{
           margin: 0,
           padding: '1rem',
@@ -40,7 +40,7 @@ export const SQLMessageBlock: React.FC<SQLMessageBlockProps> = ({ sql }) => {
         }}
         codeTagProps={{
           style: {
-            fontFamily: 'JetBrains Mono, Menlo, Monaco, Consolas, monospace',
+            fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
           },
         }}
       >

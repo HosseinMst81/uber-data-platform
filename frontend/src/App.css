@@ -124,3 +124,39 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Custom scrollbar for dark theme */
+.custom-dark-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.custom-dark-scrollbar::-webkit-scrollbar-track {
+  background: #111827;
+  border-radius: 10px;
+}
+
+.custom-dark-scrollbar::-webkit-scrollbar-thumb {
+  background: #4b5563;
+  border-radius: 10px;
+}
+
+.custom-dark-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #6b7280;
+}
+
+/* انیمیشن fade-in */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.4s ease-out forwards;
+}

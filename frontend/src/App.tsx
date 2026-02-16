@@ -4,7 +4,8 @@ import { DashboardPage } from '@/pages/DashboardPage'
 import NotfoundPage from '@/pages/NotfoundPage'
 import { Toaster } from 'sonner'
 import { cn } from '@/lib/utils'
-import { LayoutDashboard, Car } from 'lucide-react'
+import { LayoutDashboard, Car, DatabaseBackup } from 'lucide-react'
+import { SQLAssistantPage } from './pages/SQLAssistantPage'
 
 function AppLayout() {
   return (
@@ -28,6 +29,20 @@ function AppLayout() {
               Trips
             </NavLink>
             <NavLink
+              to="/sql-assistant"
+              className={({ isActive }) =>
+                cn(
+                  'flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                  isActive
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                )
+              }
+            >
+              <DatabaseBackup className="h-4 w-4" />
+              SQL-Assistant
+            </NavLink>
+            <NavLink
               to="/dashboard"
               className={({ isActive }) =>
                 cn(
@@ -48,6 +63,7 @@ function AppLayout() {
         <Routes>
           <Route path="/" element={<TripsPage />} />
           <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/sql-assistant" element={<SQLAssistantPage />} />
           <Route path="*" element={<NotfoundPage />} />
         </Routes>
       </main>

@@ -109,7 +109,7 @@ export function SQLAssistantPage() {
         <div className="grid lg:grid-cols-3 gap-6">
           {/* Chat Interface */}
           <div className="lg:col-span-2 space-y-4">
-            <Card className="flex flex-col h-[calc(100vh-12rem)]">
+            <Card className="flex flex-col">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <MessageSquare className="h-5 w-5" />

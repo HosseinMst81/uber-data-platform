@@ -111,6 +111,7 @@ export function DashboardFilters({
               </Label>
               <Input
                 type="date"
+                // className='w-auto'
                 value={filters.startDate || ''}
                 onChange={(e) =>
                   onFiltersChange({ ...filters, startDate: e.target.value || undefined })
@@ -132,11 +133,12 @@ export function DashboardFilters({
                   onFiltersChange({ ...filters, endDate: e.target.value || undefined })
                 }
                 disabled={isLoading}
+                // className='w-auto'
                 placeholder="All time"
               />
             </div>
 
-            <div className="flex-1 min-w-[200px] space-y-2">
+            <div className="flex-1 space-y-2">
               <Label>Vehicle Type</Label>
               <Select
                 value={filters.vehicleType || 'all'}

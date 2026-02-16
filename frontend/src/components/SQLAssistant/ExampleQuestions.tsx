@@ -1,4 +1,4 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Lightbulb } from 'lucide-react'
 
@@ -25,6 +25,7 @@ export function ExampleQuestions({ onExampleClick }: Props) {
           <Lightbulb className="h-4 w-4" />
           Example Questions
         </CardTitle>
+        <CardDescription>pick up one of this questions:</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="space-y-2">

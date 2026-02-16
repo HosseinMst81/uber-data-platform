@@ -3,7 +3,6 @@ require('dotenv').config({ path: '../.env' });
 const express = require('express');
 const cors = require('cors');
 const app = express();
-const { generateSQL } = require('./routes/sqlAssistant');
 
 // Middleware for read request
 app.use(express.json());                   

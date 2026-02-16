@@ -9,7 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Calendar, RefreshCw, Filter, Infinity } from 'lucide-react'
+import { Calendar, RefreshCw, Filter, Infinity as Inf } from 'lucide-react'
 import type { AnalyticsFilters } from '@/lib/analytics-types'
 
 type Props = {
@@ -72,7 +72,7 @@ export function DashboardFilters({
                 disabled={isLoading}
                 className="gap-1.5"
               >
-                <Infinity className="h-3.5 w-3.5" />
+                <Inf className="h-3.5 w-3.5" />
                 All Time
               </Button>
               <Button

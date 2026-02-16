@@ -12,6 +12,7 @@ import type {
   CreateTripPayload,
   UpdateTripStatusPayload,
 } from './types'
+import type { AnalyticsFilters, CancellationReason, KPIsData, PaymentMethod, PeakHour, VehicleAnalysis, WeekdayData } from './analytics-types'
 
 const TRIPS_PATH = '/api/trips'
 
@@ -66,5 +67,50 @@ export const tripsApi = {
    */
   async deleteTrip(bookingId: string): Promise<void> {
     await httpInterceptedService.delete(`${TRIPS_PATH}/${bookingId}`)
+  },
+}
+
+const ANALYTICS_PATH = '/api/analytics'
+export const analyticsApi = {
+  
+  async getKPIs(filters: AnalyticsFilters = {}): Promise<KPIsData> {
+    const { data } = await httpInterceptedService.get(`${ANALYTICS_PATH}/kpis`, { params: filters })
+    return toCamel<KPIsData>(data)
+  },
+
+  
+  async getCancellationReasons(filters: AnalyticsFilters = {}): Promise<CancellationReason[]> {
+    const { data } = await httpInterceptedService.get(`${ANALYTICS_PATH}/cancellation-reasons`, { params: filters })
+    return data.data.map((item: any) => toCamel<CancellationReason>(item))
+  },
+
+  
+  async getPaymentMethods(filters: AnalyticsFilters = {}): Promise<PaymentMethod[]> {
+    const { data } = await httpInterceptedService.get(`${ANALYTICS_PATH}/payment-methods`, { params: filters })
+    return data.data.map((item: any) => toCamel<PaymentMethod>(item))
+  },
+
+ 
+  async getVehicleAnalysis(filters: AnalyticsFilters = {}): Promise<VehicleAnalysis[]> {
+    const { data } = await httpInterceptedService.get(`${ANALYTICS_PATH}/vehicle-analysis`, { params: filters })
+    return data.data.map((item: any) => toCamel<VehicleAnalysis>(item))
+  },
+
+  
+  async getPeakHours(filters: AnalyticsFilters = {}): Promise<PeakHour[]> {
+    const { data } = await httpInterceptedService.get(`${ANALYTICS_PATH}/peak-hours`, { params: filters })
+    return data.data.map((item: any) => toCamel<PeakHour>(item))
+  },
+
+  
+  async getWeekdayAnalysis(filters: AnalyticsFilters = {}): Promise<WeekdayData[]> {
+    const { data } = await httpInterceptedService.get(`${ANALYTICS_PATH}/weekday-analysis`, { params: filters })
+    return data.data.map((item: any) => toCamel<WeekdayData>(item))
+  },
+
+  
+  async getVehicleTypes(): Promise<string[]> {
+    const { data } = await httpInterceptedService.get(`${ANALYTICS_PATH}/vehicle-types`)
+    return data.vehicle_types || data.vehicleTypes || []
   },
 }

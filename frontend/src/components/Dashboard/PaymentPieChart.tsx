@@ -68,7 +68,7 @@ export function PaymentPieChart({ data, isLoading }: Props) {
               cx="50%"
               cy="50%"
               labelLine={false}
-              label={({ percentage }) => `${percentage.toFixed(1)}%`}
+              label={(props) => `${(props.payload as ChartData).percentage.toFixed(1)}%`}
               outerRadius={90}
               fill="#8884d8"
               dataKey="value"

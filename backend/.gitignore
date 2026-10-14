@@ -1,0 +1,122 @@
+# ==========================================================
+#  Uber Data Platform — Backend (Node.js / Express / PostgreSQL)
+# ==========================================================
+
+# ----------------------------------------------------------
+#  Dependencies
+# ----------------------------------------------------------
+node_modules/
+jspm_packages/
+.bower_components/
+.pnp
+.pnp.js
+.pnp.cjs
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+!.yarn/sdks
+
+# ----------------------------------------------------------
+#  Environment & Secrets  —  NEVER COMMIT THESE
+# ----------------------------------------------------------
+.env
+.env.*
+!.env.example
+
+# Certificates / keys / credential files
+*.pem
+*.key
+*.crt
+*.cer
+*.p12
+*.pfx
+secrets.json
+credentials.json
+service-account*.json
+
+# ----------------------------------------------------------
+#  Logs
+# ----------------------------------------------------------
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+.npm/
+.npmrc
+
+# ----------------------------------------------------------
+#  Build / Runtime output
+# ----------------------------------------------------------
+dist/
+build/
+out/
+bin/
+tmp/
+temp/
+.cache/
+.parcel-cache/
+.eslintcache
+.node_repl_history
+.nodemonignore
+
+# ----------------------------------------------------------
+#  Testing & Coverage
+# ----------------------------------------------------------
+coverage/
+.nyc_output/
+*.lcov
+junit.xml
+test-results/
+
+# ----------------------------------------------------------
+#  Database artifacts (dumps, backups, local clusters)
+# ----------------------------------------------------------
+*.sql.gz
+*.dump
+*.backup
+*.bak
+*.pgdump
+pgdata/
+postgres-data/
+db_backup/
+
+# ----------------------------------------------------------
+#  ETL / Data-pipeline scratch output
+# ----------------------------------------------------------
+data/raw/
+data/processed/
+etl-output/
+*.csv.tmp
+*.tsv.tmp
+
+# ----------------------------------------------------------
+#  OS files
+# ----------------------------------------------------------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+desktop.ini
+
+# ----------------------------------------------------------
+#  Editors & IDEs
+# ----------------------------------------------------------
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+*.sw?
+*.sublime-workspace
+*.sublime-project
+*.ntvs*
+*.njsproj
+*.sln
+*.suo

@@ -1,6 +1,5 @@
 
--- غیرفعال کردن استفاده از ایندکس
-SET enable_indexscan = off;
+SET enable_indexscan = OFF;
 
 EXPLAIN ANALYZE
 SELECT
@@ -18,14 +17,13 @@ WHERE
 GROUP BY vehicle_type, payment_method
 ORDER BY total_revenue DESC;
 
+SET enable_seqscan = ON;
 
-
--- ایندکس گذاری
+-- Indexing
 CREATE INDEX idx_covering_force
 ON gold.gold_dataset 
 (booking_status, vehicle_type, trip_timestamp)
 INCLUDE (booking_value, payment_method, driver_rating);
 
 
--- مجبور به استفاده از اینکس
-SET enable_seqscan = OFF;
+

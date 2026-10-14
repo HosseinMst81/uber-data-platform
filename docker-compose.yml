@@ -1,0 +1,125 @@
+# ==========================================================
+#  Uber Data Platform — full stack
+#
+#    db        PostgreSQL 16 (bronze schema auto-created on first boot)
+#    backend   Express 5 REST API            http://localhost:5000
+#    frontend  nginx-served React SPA        http://localhost:8080
+#    etl       one-shot Bronze -> Silver -> Gold pipeline  [profile: tools]
+#
+#  Quick start:
+#    cp .env.example .env
+#    docker compose up -d --build
+#    docker compose --profile tools run --rm etl
+#    open http://localhost:8080
+# ==========================================================
+
+name: uber-data-platform
+
+# Shared by `backend` and `etl` — both talk to the same database.
+x-backend-env: &backend-env
+  DB_HOST: db
+  DB_PORT: 5432
+  DB_USER: ${POSTGRES_USER:-postgres}
+  DB_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+  DB_NAME: ${POSTGRES_DB:-uber_db}
+  PORT: 5000
+  OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+
+# Both services run the same image, so the build config is declared once.
+x-backend-build: &backend-build
+  context: .
+  dockerfile: backend/Dockerfile
+
+services:
+  # ------------------------------------------------------
+  #  PostgreSQL
+  # ------------------------------------------------------
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-uber_db}
+    ports:
+      # Host port 5433 by default, so it does not clash with a local
+      # PostgreSQL already listening on 5432.
+      - "${POSTGRES_HOST_PORT:-5433}:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      # Creates the bronze schema + raw_dataset table.
+      # Runs ONLY when the data volume is still empty.
+      - ./database/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    networks: [uber_net]
+
+  # ------------------------------------------------------
+  #  Backend API
+  # ------------------------------------------------------
+  backend:
+    build: *backend-build
+    image: uber-data-platform/backend:latest
+    restart: unless-stopped
+    init: true
+    environment: *backend-env
+    ports:
+      - "${BACKEND_PORT:-5000}:5000"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks: [uber_net]
+
+  # ------------------------------------------------------
+  #  Frontend SPA
+  # ------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        # "/" serves the API same-origin through the nginx proxy instead of
+        # calling the backend port directly.
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:5000}
+    image: uber-data-platform/frontend:latest
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-8080}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks: [uber_net]
+
+  # ------------------------------------------------------
+  #  ETL — one-shot, opt-in
+  #    docker compose --profile tools run --rm etl
+  # ------------------------------------------------------
+  etl:
+    build: *backend-build
+    image: uber-data-platform/backend:latest
+    profiles: [tools]
+    init: true
+    environment: *backend-env
+    command:
+      - sh
+      - -c
+      - >-
+        node src/scripts/import_bronze.js &&
+        node src/scripts/silver_etl.js &&
+        node src/scripts/gold_etl.js
+    depends_on:
+      db:
+        condition: service_healthy
+    networks: [uber_net]
+
+volumes:
+  db_data:
+    driver: local
+
+networks:
+  uber_net:
+    driver: bridge

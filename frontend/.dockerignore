@@ -1,0 +1,33 @@
+# ==========================================================
+#  Build context: ./frontend  (used by frontend/Dockerfile)
+# ==========================================================
+
+# --- Dependencies (installed inside the image instead) ---
+node_modules
+
+# --- Build output (the image builds a fresh bundle) ---
+dist
+dist-ssr
+
+# --- Local overrides / secrets ---
+*.local
+.env
+.env.*
+!.env.example
+
+# --- Logs ---
+*.log
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# --- Editors / OS ---
+.vscode
+.idea
+.DS_Store
+Thumbs.db
+
+# --- Not needed inside the image ---
+README.md
+Dockerfile
+.dockerignore

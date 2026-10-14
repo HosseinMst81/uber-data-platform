@@ -33,6 +33,7 @@
   - [Analytics API](#analytics-api)
   - [SQL Assistant API](#sql-assistant-api)
 - [Getting Started](#-getting-started)
+- [Docker Deployment](#-docker-deployment)
 - [Environment Variables](#-environment-variables)
 - [ETL Runbook](#-etl-runbook)
 - [Performance & Indexing](#-performance--indexing)
@@ -56,6 +57,7 @@ The project demonstrates the full lifecycle of an analytical data product:
 | **Transform** | Feature engineering, column normalization, cancellation-reason unification, and per-vehicle rating imputation (Silver → Gold) |
 | **Serve** | An Express 5 REST API delivers paginated CRUD plus seven pre-aggregated analytics endpoints |
 | **Interact** | A React 19 dashboard visualizes KPIs and charts; an LLM-powered assistant converts natural language into validated PostgreSQL `SELECT` statements |
+| **Ship** | The entire stack — database, ETL, API, and UI — is containerized and starts from a single `docker compose up` |
 
 The schema follows the **Medallion (Bronze → Silver → Gold)** pattern inside a single PostgreSQL instance, so every layer is independently auditable and the raw data is never mutated.
 
@@ -318,6 +320,10 @@ CREATE TABLE gold.gold_dataset (
 <tr><td>React Router 7</td><td>Client-side routing</td></tr>
 <tr><td>react-hook-form + Zod</td><td>Form state and validation</td></tr>
 <tr><td>Axios + sonner + sql-formatter</td><td>HTTP, toasts, SQL highlighting</td></tr>
+<tr><td rowspan="4"><b>DevOps</b></td><td>Docker multi-stage builds</td><td>Reproducible API and SPA images</td></tr>
+<tr><td>Docker Compose</td><td>Service orchestration, healthchecks, named volumes</td></tr>
+<tr><td>nginx (Alpine)</td><td>Static SPA hosting, gzip, SPA fallback, API reverse proxy</td></tr>
+<tr><td>PostgreSQL init hooks</td><td>Automatic Bronze schema bootstrap on first boot</td></tr>
 </table>
 
 ---
@@ -329,6 +335,7 @@ uber_data_platform/
 ├── backend/                          # Express 5 REST API
 │   ├── .env                          # ⚠️ secrets — gitignored
 │   ├── .gitignore
+│   ├── Dockerfile                    # API + ETL runtime image
 │   ├── package.json
 │   └── src/
 │       ├── index.js                  # App entry: middleware + route mounting
@@ -350,10 +357,15 @@ uber_data_platform/
 │       └── usefull_reports_queries.sql  # Data-quality audit queries
 │
 ├── database/
+│   ├── init/
+│   │   └── 01_bronze_schema.sql      # first-boot bronze schema + raw table
 │   └── original_dataset.csv          # 150,000 rows · 17 columns
 │
 ├── frontend/                         # React 19 SPA
+│   ├── .dockerignore
 │   ├── .gitignore
+│   ├── Dockerfile                    # multi-stage: Vite build → nginx
+│   ├── nginx.conf                    # SPA fallback + /api reverse proxy
 │   ├── package.json
 │   ├── vite.config.ts                # `@` → ./src alias
 │   └── src/
@@ -376,6 +388,10 @@ uber_data_platform/
 │           ├── Charts/               # shared chart primitives
 │           └── ui/                   # shadcn/ui primitives
 │
+├── .dockerignore                     # backend build-context exclusions
+├── .env.example                      # Docker Compose configuration template
+├── .gitignore
+├── docker-compose.yml                # full-stack topology
 ├── User Data Platform Report.pdf     # Written project report
 └── README.md                         # ← you are here
 ```
@@ -606,6 +622,8 @@ curl -X POST http://localhost:5000/api/sql-assistant/generate \
 
 ## 🚀 Getting Started
 
+> 🐳 **Want the whole stack up in one command?** Jump to [Docker Deployment](#-docker-deployment). The steps below are the manual, host-installed path.
+
 ### Prerequisites
 
 | Requirement | Version |
@@ -693,6 +711,139 @@ VITE_API_BASE_URL=http://localhost:5000
 
 ---
 
+## 🐳 Docker Deployment
+
+The entire platform — PostgreSQL, the ETL pipeline, the Express API, and the nginx-served SPA — runs from a single Compose file. No Node.js, npm, or PostgreSQL installation is required on the host; only Docker.
+
+### Services
+
+| Service | Image | Host address | Role |
+|---|---|---|---|
+| `db` | `postgres:16-alpine` | `localhost:5433` | Warehouse. Creates the `bronze` schema on first boot |
+| `backend` | built from `backend/Dockerfile` | `localhost:5000` | Express REST API + the ETL runtime |
+| `frontend` | built from `frontend/Dockerfile` | `localhost:8080` | nginx serving the Vite bundle |
+| `etl` | reuses the backend image | — | One-shot Bronze → Silver → Gold run (profile: `tools`) |
+
+### Docker files
+
+```
+docker-compose.yml                    # service topology, healthchecks, volumes
+.env.example                          # → copy to .env
+.dockerignore                         # backend build context (repo root)
+backend/Dockerfile                    # API + ETL image
+frontend/Dockerfile                   # multi-stage: Vite build → nginx
+frontend/nginx.conf                   # SPA fallback + /api reverse proxy
+frontend/.dockerignore
+database/init/01_bronze_schema.sql    # first-boot bootstrap (bronze schema + table)
+```
+
+### Quick start
+
+```bash
+# 1 · Configuration
+cp .env.example .env
+#    → set a real POSTGRES_PASSWORD and your OPENROUTER_API_KEY
+
+# 2 · Build and start the database, API, and UI
+docker compose up -d --build
+
+# 3 · Load the data (one-shot; safe to re-run)
+docker compose --profile tools run --rm etl
+```
+
+Then open **<http://localhost:8080>**.
+
+Step 3 is required — the containers start with an **empty** warehouse. Until the ETL finishes, the dashboard shows zeros and `/api/trips` returns an empty page.
+
+### Startup order
+
+Compose gates each service on the previous one's healthcheck, so nothing races:
+
+```
+db (pg_isready)  →  backend (TCP :5000)  →  frontend
+                  ↘  etl (manual, after db is healthy)
+```
+
+### Why the backend build context is the repository root
+
+`backend/Dockerfile` needs **both** `backend/` and `database/`, because `import_bronze.js` reads the 150k-row dataset from `database/original_dataset.csv`. Compose therefore uses `context: .` together with `dockerfile: backend/Dockerfile`. The frontend has no such dependency and builds from its own directory.
+
+### Networking: two supported topologies
+
+Vite inlines `import.meta.env` values **at build time**, so the API base URL is baked into the bundle. That gives two deployment shapes:
+
+| Mode | `VITE_API_BASE_URL` | Traffic path | CORS |
+|---|---|---|---|
+| **Direct** (default) | `http://localhost:5000` | Browser → `backend:5000` | Uses the app's existing permissive `cors()` |
+| **Same-origin** | `/` | Browser → nginx `:8080/api/*` → `backend:5000` | Not involved at all |
+
+To switch to same-origin, set `VITE_API_BASE_URL=/` in `.env` and rebuild only the frontend:
+
+```bash
+docker compose build frontend && docker compose up -d frontend
+```
+
+The nginx `location /api/` block is always present, so the same-origin path works without editing `nginx.conf`.
+
+### Ports
+
+All host ports are overridable in `.env`:
+
+| Variable | Default | Why this default |
+|---|---|---|
+| `POSTGRES_HOST_PORT` | `5433` | Avoids clashing with a local PostgreSQL already on `5432` |
+| `BACKEND_PORT` | `5000` | Standard, and matches the SPA's dev-time default |
+| `FRONTEND_PORT` | `8080` | Avoids clashing with the Vite dev server on `5173` |
+
+### Persistence
+
+The `db_data` named volume holds the PostgreSQL data directory, so your loaded data survives `docker compose down` and image rebuilds. The `database/init/` SQL scripts run **only once**, when that volume is first created.
+
+```bash
+docker compose down            # stop, keep all data
+docker compose down -v         # stop and DESTROY the warehouse
+docker compose up -d --build   # rebuild images, keep data
+```
+
+After a `down -v`, the init scripts re-run and you must re-run the ETL.
+
+### Rebuilding after code changes
+
+```bash
+docker compose up -d --build            # both images
+docker compose up -d --build backend    # API only
+docker compose build --no-cache backend # bypass the layer cache
+```
+
+### Container-specific behaviour
+
+- **The Bronze importer was fixed for containers.** It now awaits its inserts, wraps the load in a transaction, `TRUNCATE`s before reloading (matching Silver and Gold), and closes the pool so the one-shot container actually exits. It also resolves the CSV via `__dirname`, making it independent of the working directory.
+- **`.env` files are never copied into images.** `.dockerignore` excludes every `.env`, so secrets reach the containers only as runtime environment variables from Compose. The backend's `dotenv` calls resolve to non-existent paths inside the image and quietly no-op.
+- **No `.env` is needed inside the containers.** `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, and `OPENROUTER_API_KEY` are injected by `docker-compose.yml`.
+- **The backend runs as the non-root `node` user.**
+
+### Troubleshooting
+
+| Symptom | Cause / fix |
+|---|---|
+| Dashboard is empty, `/api/trips` returns `total: 0` | The ETL has not run → `docker compose --profile tools run --rm etl` |
+| SQL Assistant returns `500` | `OPENROUTER_API_KEY` is empty or invalid → set it in `.env`, then `docker compose up -d backend` |
+| Port already in use | A local service owns `5000`/`5432`/`8080` → change the `*_PORT` values in `.env` |
+| `etl` container exits non-zero partway | Check `docker compose logs`; the failing stage rolls back, so the warehouse is left consistent |
+| Frontend still calls the wrong API URL | `VITE_API_BASE_URL` is baked at build time → `docker compose build frontend` |
+| Init scripts did not create the `bronze` schema | The `db_data` volume already existed → `docker compose down -v` and start again |
+
+### Verifying the deployment
+
+```bash
+docker compose ps                                   # all services healthy?
+curl http://localhost:5000/api/analytics/vehicle-types
+curl "http://localhost:5000/api/analytics/kpis?vehicleType=Go"
+docker compose --profile tools run --rm etl         # re-run the pipeline any time
+```
+
+---
+
 ## 🔐 Environment Variables
 
 ### `backend/.env`
@@ -713,7 +864,20 @@ VITE_API_BASE_URL=http://localhost:5000
 |---|:---:|---|---|
 | `VITE_API_BASE_URL` | ➖ | `http://localhost:5000` | Backend base URL (trailing slash stripped) |
 
-> 🔒 `backend/.env` is **gitignored**. Commit a `.env.example` with placeholder values instead — never a real key.
+### `.env` — Docker Compose (repository root)
+
+| Variable | Required | Default | Description |
+|---|:---:|---|---|
+| `POSTGRES_USER` | ➖ | `postgres` | Database role created by the `postgres` image |
+| `POSTGRES_PASSWORD` | ➖ | `postgres` | **Change this** — also passed to the backend as `DB_PASSWORD` |
+| `POSTGRES_DB` | ➖ | `uber_db` | Database created on first boot |
+| `POSTGRES_HOST_PORT` | ➖ | `5433` | Host port mapped to container `5432` |
+| `BACKEND_PORT` | ➖ | `5000` | Host port mapped to the API container |
+| `FRONTEND_PORT` | ➖ | `8080` | Host port mapped to the nginx container |
+| `OPENROUTER_API_KEY` | ➖ | *(empty)* | Injected into the backend; the SQL assistant returns `500` without it |
+| `VITE_API_BASE_URL` | ➖ | `http://localhost:5000` | **Build-time** argument for the frontend image |
+
+> 🔒 Both `.env` files are **gitignored** (the repository-root one protects the Compose password). Commit `.env.example` with placeholder values instead — never a real key.
 
 ---
 
@@ -721,12 +885,25 @@ VITE_API_BASE_URL=http://localhost:5000
 
 Run the three stages **in order**. Each is idempotent and safe to re-run.
 
+### 🐳 In Docker (recommended)
+
+The opt-in `etl` service chains all three stages in a single container against the `db` service:
+
+```bash
+docker compose --profile tools run --rm etl
+```
+
+`--profile tools` opts the one-shot service in from its profile, `--rm` discards the container afterwards, and the shell `&&` chain stops at the first failure. Re-run it whenever you like — every stage truncates and reloads, so repeated runs converge on the same state.
+
+### 💻 On the host
+
 ```bash
 cd backend/src/scripts
 
 # 1️⃣  Bronze — stream the CSV into bronze.raw_dataset
 node import_bronze.js
-#    → Import done
+#    📥 Importing /…/database/original_dataset.csv
+#    ✅ Bronze import finished — 150000 rows inserted
 
 # 2️⃣  Silver — clean, engineer features, unify reasons, impute ratings
 node silver_etl.js
@@ -748,7 +925,7 @@ node gold_etl.js
 
 | Stage | Guarantee |
 |---|---|
-| `import_bronze.js` | Streams via `csv-parser` (constant memory); converts `"null"` → SQL `NULL` |
+| `import_bronze.js` | Single transaction — `COMMIT` on success, `ROLLBACK` on any error; `TRUNCATE` first for a clean rebuild; streams via `csv-parser` with backpressure applied by `for await`; batches 500 rows per multi-row `INSERT`; converts `"null"` → SQL `NULL`; releases the client and closes the pool so the process exits |
 | `silver_etl.js` | Single transaction — `COMMIT` on success, `ROLLBACK` on any error; `TRUNCATE` first for a clean rebuild; `ON CONFLICT (booking_id) DO NOTHING` |
 | `gold_etl.js` | Same transactional pattern; `CREATE TABLE IF NOT EXISTS` so constraints are applied once; `revenue_per_km` guarded against zero distance |
 
@@ -896,9 +1073,9 @@ Documented honestly — these are the natural next steps, not hidden defects.
 
 **Robustness**
 
-- [ ] **Working-directory-dependent env loading.** `dotenv` paths in `index.js` and `db.js` resolve against `process.cwd()`. Refactor to `path.resolve(__dirname, '..', '.env')` so the app can be started from anywhere.
-- [ ] **Sequential Bronze insert.** `import_bronze.js` awaits one `INSERT` per row inside a stream `data` handler — correct but slow for 150k rows. Batch with `pg-copy-streams` or multi-row `INSERT`.
-- [ ] **No `INSERT` error handling in Bronze.** A malformed row aborts the stream silently; wrap per-row inserts and collect rejects.
+- [ ] **Working-directory-dependent env loading (partly fixed).** `import_bronze.js` now resolves the dataset via `__dirname`, so it runs from any directory. However, the `dotenv` paths in `index.js`, `db.js`, `silver_etl.js`, and `gold_etl.js` still resolve against `process.cwd()`. This is harmless inside Docker (configuration arrives as environment variables), but local runs still need the documented `cd`. Refactor to `path.resolve(__dirname, …)` throughout.
+- [ ] **Bronze ingestion is batched, not bulk.** 500 rows per multi-row `INSERT` is far better than one round-trip per row, but `COPY … FROM STDIN` via `pg-copy-streams` would be faster still for 150k rows.
+- [ ] **No `INSERT` error recovery in Bronze.** A malformed row now fails the transaction loudly and rolls back (previously it surfaced as an unhandled rejection). Skipping bad rows into a rejects table would be more forgiving.
 
 **API quality**
 
@@ -927,7 +1104,7 @@ Documented honestly — these are the natural next steps, not hidden defects.
 > **Action required before publishing this repository.**
 
 1. **Rotate the exposed OpenRouter key.** The committed `backend/.env` contains a live `OPENROUTER_API_KEY` and a database password. Even though `backend/.gitignore` now excludes `.env`, **any key that has been committed to Git history remains compromised** — purge it with [`git filter-repo`](https://github.com/newren/git-filter-repo) or the [BFG Repo-Cleaner](https://rtyley.github.io/bfg-repo-cleaner/), then rotate the key at the provider.
-2. **Never commit `.env`.** Commit `backend/.env.example` with placeholders.
+2. **Never commit `.env`.** Both `backend/.env` and the repository-root `.env` (Docker Compose) are gitignored; the root `.gitignore` and `backend/.gitignore` enforce it. Commit `.env.example` files with placeholders instead. `.dockerignore` also excludes every `.env`, so no secret can be baked into an image layer.
 3. **Use a least-privilege database role.** The app currently connects as `postgres`. Create a dedicated role with `SELECT` on `gold`, plus `INSERT`/`UPDATE`/`DELETE` only if the write endpoints are genuinely required.
 4. **Add authentication** before exposing the API beyond localhost — every endpoint is currently public, and `CORS` accepts all origins.
 5. **Pin the dependency tree.** `package-lock.json` is committed; run `npm audit` and `npm ci` in CI to catch supply-chain issues.

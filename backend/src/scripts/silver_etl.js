@@ -55,32 +55,37 @@ async function runSilverETL() {
         customer_id,
         vehicle_type,
         booking_status,
-        booking_value,
-        ride_distance,
+        -- Cast TEXT -> NUMERIC (empty string -> NULL)
+        NULLIF(booking_value, '')::NUMERIC(10,2)  AS booking_value,
+        NULLIF(ride_distance, '')::NUMERIC(10,2)  AS ride_distance,
         payment_method,
         -- Combine date and time into timestamp
-        (date + time)::TIMESTAMP AS trip_timestamp,
+        (date || ' ' || time)::TIMESTAMP AS trip_timestamp,
         -- Extract hour from time
-        EXTRACT(HOUR FROM time) AS pickup_hour,
+        EXTRACT(HOUR FROM time::time) AS pickup_hour,
         -- Extract day of week (0=Sunday, 6=Saturday)
-        EXTRACT(DOW FROM date) AS day_of_week,
+        EXTRACT(DOW FROM date::date) AS day_of_week,
         -- Get full day name
-        TO_CHAR(date, 'FMDay') AS day_name,
+        TO_CHAR(date::date, 'FMDay') AS day_name,
         -- Extract month
-        EXTRACT(MONTH FROM date) AS month,
+        EXTRACT(MONTH FROM date::date) AS month,
         -- Extract year
-        EXTRACT(YEAR FROM date) AS year,
+        EXTRACT(YEAR FROM date::date) AS year,
         -- Check if weekend (Sunday or Saturday)
-        CASE WHEN EXTRACT(DOW FROM date) IN (0, 6) THEN TRUE ELSE FALSE END AS is_weekend,
-        -- Unified cancellation reason: pick reason from the column with non-null indicator
+        CASE
+          WHEN EXTRACT(DOW FROM date::date) IN (0, 6) THEN TRUE
+          ELSE FALSE
+        END AS is_weekend,
+        -- Unified cancellation reason
         CASE
           WHEN cancelled_by_customer IS NOT NULL THEN customer_cancel_reason
           WHEN cancelled_by_driver IS NOT NULL THEN driver_cancel_reason
           WHEN incomplete_rides IS NOT NULL THEN incomplete_reason
-          ELSE 'Reason Not Specified'  -- Default value instead of NULL
+          ELSE 'Reason Not Specified'
         END AS unified_cancellation_reason,
-        driver_rating,
-        customer_rating,
+        -- Cast TEXT -> NUMERIC (empty string -> NULL)
+        NULLIF(driver_rating, '')::NUMERIC(3,2)   AS driver_rating,
+        NULLIF(customer_rating, '')::NUMERIC(3,2) AS customer_rating,
         -- Mark as cancelled if booking status is not 'Completed'
         booking_status != 'Completed' AS is_cancelled
       FROM bronze.raw_dataset

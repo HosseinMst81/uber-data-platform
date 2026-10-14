@@ -23,6 +23,7 @@
 
 - [Overview](#-overview)
 - [Key Features](#-key-features)
+- [Screenshots](#-screenshots)
 - [Architecture](#-architecture)
 - [Data Architecture — the Medallion Pipeline](#-data-architecture--the-medallion-pipeline)
 - [Database Schema](#-database-schema)
@@ -115,6 +116,50 @@ The schema follows the **Medallion (Bronze → Silver → Gold)** pattern inside
 </td>
 </tr>
 </table>
+
+---
+
+## 📸 Screenshots
+
+Every shot below is from the running stack with the full dataset loaded. Note that **148,767 trips** reach the Gold layer — the `ON CONFLICT (booking_id) DO NOTHING` guard in the Silver load absorbs 1,233 duplicate booking IDs present in the 150,000-row source.
+
+### 🚗 Trips — `/`
+
+![Trips list with pagination, status badges and per-row actions](screenshots/Main%20page%20all%20trips%20table.png)
+
+*The landing page. Server-side pagination across **14,877 pages**, status badges (Completed · Incomplete · Cancelled by Driver · No Driver Found), the derived `Rev/km` column, and per-row edit/delete actions. Cancelled rows carry no value, distance, or rating — exactly the `NULL`s the Gold layer preserves rather than coercing to zero.*
+
+### 📊 Analytics Dashboard — `/dashboard`
+
+![Dashboard header with quick filters and the four KPI cards](screenshots/Analytics%20dashboard%20KPI%27s.png)
+
+*Dashboard header: quick-filter presets (All Time / 7 / 30 / 90 days), a custom date range, a vehicle-type selector, and a reset action — all of which drive the same `startDate` / `endDate` / `vehicleType` query parameters documented in the [Analytics API](#analytics-api). The figures shown are filtered to **Auto**: 37,128 bookings, 22,970 successful trips, $11,636,666 revenue, 61.9% success rate.*
+
+![Hourly trip distribution line chart with the 18:00 peak highlighted](screenshots/Time%20Based%20Trip%20Analysis%20Daily%20Chart.png)
+
+*The **Hourly** view of time-based analysis — this is the `pickup_hour` feature engineered in the Silver layer, surfaced by `GET /api/analytics/peak-hours`. Demand troughs overnight, climbs through the morning, dips at 13:00, then peaks at **18:00 with 12,298 trips**.*
+
+![Weekly trip counts against average revenue, Friday highlighted](screenshots/Time%20Based%20Trip%20Analysis%20Weekly%20Chart.png)
+
+*The **Weekly** view plots trip count (left axis) against average revenue (right axis), backed by `GET /api/analytics/weekday-analysis`. The Monday→Sunday ordering comes from the explicit `CASE` sort in the SQL, not lexicographic `ORDER BY`. Tooltip: **Friday, 21,222 trips, $460.06 average revenue**.*
+
+![Vehicle analysis bar chart comparing total trips and average driver rating](screenshots/Vehicle%20Analysis%20Chart.png)
+
+*Per-vehicle comparison — total trips (left axis) against average driver rating (right axis). Auto leads on volume by a wide margin while Uber XL trails. The ratings sit tightly in the 4.0–4.1 band for every vehicle type, which is the visible fingerprint of the per-vehicle-type rating imputation described in the [Silver layer](#-silver--cleaned--engineered).*
+
+![Payment method distribution donut chart](screenshots/Payment%20Method%20Chart.png)
+
+*Payment-method distribution from `GET /api/analytics/payment-methods`. UPI (30.6%) and Wallet (32.0%) together account for nearly two-thirds of all transactions, ahead of Cash (16.9%), Uber Wallet (8.2%), Credit Card (6.8%) and Debit Card (5.5%).*
+
+![Cancellation reasons donut chart beside a ranked table of all thirteen reasons](screenshots/Cancellation%20reasons%20Chart.png)
+
+*The payoff of the `unified_cancellation_reason` transformation: **56,520 cancellations** collapsed from six source columns into one analysable dimension, shown as a top-5 donut beside the complete 13-row ranked breakdown.*
+
+### 🤖 SQL Assistant — `/sql-assistant`
+
+![SQL Assistant generating a complex multi-clause query](screenshots/Chat%20With%20AI%20Assistant%20--%20Complex%20Query.png)
+
+*A deliberately multi-clause prompt — "average revenue per vehicle type, along with number of trips, total distance and driver points earned for each month through 2024, for completions only (non-cancellations), sorted by month and vehicle type" — resolved into valid PostgreSQL. Two details worth noting in the visible portion: the model mapped "non-cancellations" onto the derived `is_cancelled = FALSE` boolean rather than matching the raw `booking_status` text, and it translated "through 2024" into the half-open range `trip_timestamp < '2025-01-01'` instead of a `BETWEEN`. The right rail offers the generated SQL with syntax highlighting, a copy button, and a library of example questions.*
 
 ---
 
@@ -287,15 +332,18 @@ CREATE TABLE gold.gold_dataset (
 );
 ```
 
-**Dimensional summary**
+**Dimensional summary** (observed in the loaded dataset, ordered by volume)
 
 | Dimension | Distinct values |
 |---|---|
-| `vehicle_type` | Sedan · Auto · eBike · Bike · Moto · Mini · XL · Go |
-| `payment_method` | Cash · Credit Card · Digital Wallet |
-| `booking_status` | `Completed` + cancellation/incomplete states |
+| `vehicle_type` | `Auto` · `Go Mini` · `Go Sedan` · `Bike` · `Premier Sedan` · `eBike` · `Uber XL` · `Go` |
+| `payment_method` | `Wallet` · `UPI` · `Cash` · `Uber Wallet` · `Credit Card` · `Debit Card` |
+| `booking_status` | `Completed` · `Incomplete` · `Cancelled by Driver` · `No Driver Found` |
 | `pickup_hour` | `0`–`23` |
 | `day_name` | `Monday` … `Sunday` |
+| `unified_cancellation_reason` | 13 values — see the [cancellation taxonomy](#observed-cancellation-taxonomy) |
+
+> ⚠️ **Known inconsistency:** the `GOLD_SCHEMA` constant in `sqlAssistantController.js` advertises placeholder vehicle types (`Sedan`, `Moto`, `Mini`, `XL`, `Go`) that do not match the real values above. Because that text is injected into the system prompt, it can mislead the model into generating queries that match no rows. Correcting it is on the [roadmap](#-known-limitations--roadmap).
 
 ---
 
@@ -392,6 +440,7 @@ uber_data_platform/
 ├── .env.example                      # Docker Compose configuration template
 ├── .gitignore
 ├── docker-compose.yml                # full-stack topology
+├── screenshots/                      # UI captures embedded in this README
 ├── User Data Platform Report.pdf     # Written project report
 └── README.md                         # ← you are here
 ```
@@ -1025,6 +1074,29 @@ WHERE booking_status = 'Completed';
 - **Average rating by vehicle type** — sanity-checks the imputation's effect per segment
 - **`revenue_per_km` completeness** — counts `NULL` values (expected for zero-distance trips) and averages revenue-per-km per vehicle
 
+### Observed cancellation taxonomy
+
+The unification logic in `silver_etl.js` collapses six Bronze columns into one dimension. Every value it produces, measured over the full dataset:
+
+| # | `unified_cancellation_reason` | Count | Share |
+|--:|---|--:|--:|
+| 1 | Reason Not Specified | 10,403 | 18.4% |
+| 2 | Customer related issue | 6,777 | 12.0% |
+| 3 | The customer was coughing/sick | 6,693 | 11.8% |
+| 4 | Personal & Car related issues | 6,675 | 11.8% |
+| 5 | More than permitted people in there | 6,644 | 11.8% |
+| 6 | Customer Demand | 3,014 | 5.3% |
+| 7 | Vehicle Breakdown | 2,993 | 5.3% |
+| 8 | Other Issue | 2,919 | 5.2% |
+| 9 | Wrong Address | 2,348 | 4.2% |
+| 10 | Change of plans | 2,326 | 4.1% |
+| 11 | Driver is not moving towards pickup location | 2,315 | 4.1% |
+| 12 | Driver asked to cancel | 2,274 | 4.0% |
+| 13 | AC is not working | 1,139 | 2.0% |
+| | **Total** | **56,520** | **100%** |
+
+Two things this table proves: the `'Reason Not Specified'` sentinel fires for 18.4% of cancellations (so a large share of the source genuinely lacked a reason rather than the `COALESCE` chain failing), and no row escaped the collapse — the 13 shares sum to exactly 100%.
+
 ### Integrity constraints enforced by design
 
 | Constraint | Layer | Effect |
@@ -1038,7 +1110,7 @@ WHERE booking_status = 'Completed';
 
 ## 🎨 Frontend
 
-A four-route SPA consuming the API above.
+A four-route SPA consuming the API above. See [Screenshots](#-screenshots) for what each route looks like with real data loaded.
 
 | Route | Page | Highlights |
 |---|---|---|
@@ -1088,7 +1160,14 @@ Documented honestly — these are the natural next steps, not hidden defects.
 
 - [ ] Generated SQL is **not executed** — add a read-only execution path with a statement timeout and a `SELECT`-only allowlist.
 - [ ] Prompt-injection defence relies on the system prompt alone; add an AST/parser-level validation layer (e.g. `pgsql-ast-parser`) before any execution.
+- [ ] **`GOLD_SCHEMA` lists vehicle types that do not exist in the data** (`Sedan`, `Moto`, `Mini`, `XL`). Since this text is injected into the system prompt, the model can generate predicates that match zero rows. The advertised values should be generated from `SELECT DISTINCT vehicle_type` rather than hand-written.
 - [ ] No conversation memory or query history.
+
+**Frontend polish**
+
+- [ ] The payment-methods donut renders a spurious `value` legend entry at `0.0%` — a Recharts series picking up a raw `value` key instead of a named `dataKey`. Visible in the [screenshot](#-screenshots).
+- [ ] `frontend/README.md` is still the stock Vite template; it should point at this document or be removed.
+- [ ] No loading, empty, or error states are described for the analytics cards when the warehouse has not been seeded yet.
 
 **Data platform**
 

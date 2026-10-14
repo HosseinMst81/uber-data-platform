@@ -32,10 +32,11 @@ logs
 .DS_Store
 Thumbs.db
 
-# --- Docs, reports and CI (not needed at runtime) ---
+# --- Docs, reports, screenshots and CI (not needed at runtime) ---
 .github
 *.pdf
 **/*.md
+screenshots
 
 # --- Docker plumbing itself ---
 docker-compose*.yml

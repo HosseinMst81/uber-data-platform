@@ -1,0 +1,43 @@
+# ==========================================================
+#  Build context: REPOSITORY ROOT  (used by backend/Dockerfile)
+# ==========================================================
+
+# --- Version control ---
+.git
+.gitattributes
+.gitignore
+
+# --- Dependencies (installed inside the image instead) ---
+**/node_modules
+
+# --- Secrets: never bake these into an image layer ---
+.env
+.env.*
+**/.env
+**/.env.*
+!.env.example
+!**/.env.example
+
+# --- Build output ---
+**/dist
+**/build
+
+# --- Logs ---
+**/*.log
+logs
+
+# --- Editors / OS ---
+.vscode
+.idea
+.DS_Store
+Thumbs.db
+
+# --- Docs, reports and CI (not needed at runtime) ---
+.github
+*.pdf
+**/*.md
+
+# --- Docker plumbing itself ---
+docker-compose*.yml
+**/Dockerfile
+**/.dockerignore

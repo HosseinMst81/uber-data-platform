@@ -8,8 +8,9 @@
 .env.*
 !.env.example
 
-backend/.env
-frontend/.env
+**/.env
+**/.env.*
+!**/.env.example
 
 # --- Dependencies ---
 node_modules/
